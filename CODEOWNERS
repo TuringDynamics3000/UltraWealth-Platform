@@ -1,0 +1,76 @@
+# UltraWealth Platform CODEOWNERS
+# 
+# This file defines code ownership for the platform.
+# Changes to protected paths require approval from designated owners.
+
+# =============================================================================
+# DEFAULT OWNER
+# =============================================================================
+* @TuringDynamics3000/platform-team
+
+# =============================================================================
+# PLATFORM CORE
+# =============================================================================
+
+# Tenancy module - requires platform team approval
+/platform/tenancy/ @TuringDynamics3000/platform-team @TuringDynamics3000/security-team
+
+# Governance module - requires governance team approval
+/platform/governance/ @TuringDynamics3000/governance-team @TuringDynamics3000/platform-team
+
+# Evidence module - requires platform team approval
+/platform/evidence/ @TuringDynamics3000/platform-team
+
+# Security module - requires security team approval
+/platform/security/ @TuringDynamics3000/security-team @TuringDynamics3000/platform-team
+
+# =============================================================================
+# API LAYER
+# =============================================================================
+
+# API routes and middleware
+/api/ @TuringDynamics3000/platform-team
+
+# =============================================================================
+# TENANTS
+# =============================================================================
+
+# Family Office tenant
+/tenants/family-office/ @TuringDynamics3000/fo-team @TuringDynamics3000/governance-team
+
+# Retail tenant
+/tenants/retail/ @TuringDynamics3000/retail-team @TuringDynamics3000/governance-team
+
+# Advisor tenant
+/tenants/advisor/ @TuringDynamics3000/advisor-team @TuringDynamics3000/governance-team
+
+# =============================================================================
+# GOVERNANCE ARTEFACTS
+# =============================================================================
+
+# CI workflows - requires platform team approval
+/.github/workflows/ @TuringDynamics3000/platform-team @TuringDynamics3000/governance-team
+
+# PR template - requires governance team approval
+/.github/PULL_REQUEST_TEMPLATE.md @TuringDynamics3000/governance-team
+
+# CODEOWNERS itself - requires platform lead approval
+/CODEOWNERS @TuringDynamics3000/platform-lead
+
+# =============================================================================
+# DOCUMENTATION
+# =============================================================================
+
+# Infrastructure docs - requires platform team approval
+/docs/infrastructure/ @TuringDynamics3000/platform-team
+
+# Architecture docs
+/docs/architecture/ @TuringDynamics3000/platform-team
+
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+
+# Package configuration
+/package.json @TuringDynamics3000/platform-team
+/tsconfig.json @TuringDynamics3000/platform-team

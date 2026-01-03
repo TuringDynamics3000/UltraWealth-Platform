@@ -1,0 +1,301 @@
+name: Platform Governance
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  # =============================================================================
+  # GOVERNANCE ENFORCEMENT
+  # =============================================================================
+  governance-scan:
+    name: Governance Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Scan for Advisory Language
+        run: |
+          echo "Scanning for forbidden advisory language..."
+          
+          FORBIDDEN_PATTERNS=(
+            "recommend"
+            "suggest"
+            "should invest"
+            "should buy"
+            "should sell"
+            "optimise"
+            "optimize"
+            "outperform"
+            "beat the market"
+            "guaranteed return"
+          )
+          
+          VIOLATIONS=0
+          
+          for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
+            if grep -rni --include="*.ts" --include="*.tsx" --include="*.md" "$pattern" \
+               --exclude-dir=node_modules \
+               --exclude-dir=.git \
+               --exclude="THREAT_MODEL.md" \
+               platform/ tenants/ api/ 2>/dev/null; then
+              echo "VIOLATION: Found forbidden pattern '$pattern'"
+              VIOLATIONS=$((VIOLATIONS + 1))
+            fi
+          done
+          
+          if [ $VIOLATIONS -gt 0 ]; then
+            echo ""
+            echo "=========================================="
+            echo "GOVERNANCE FAILURE: Advisory language detected"
+            echo "Found $VIOLATIONS violation(s)"
+            echo "=========================================="
+            exit 1
+          fi
+          
+          echo "✓ No advisory language violations found"
+
+      - name: Scan for Execution Capability
+        run: |
+          echo "Scanning for forbidden execution capabilities..."
+          
+          FORBIDDEN_PATTERNS=(
+            "placeOrder"
+            "submitTrade"
+            "executeTrade"
+            "executeOrder"
+            "rebalance("
+            "\.trade("
+            "\.order("
+            "broker\.execute"
+            "custodian\.execute"
+          )
+          
+          VIOLATIONS=0
+          
+          for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
+            if grep -rn --include="*.ts" --include="*.tsx" "$pattern" \
+               --exclude-dir=node_modules \
+               --exclude-dir=.git \
+               platform/ tenants/ api/ 2>/dev/null; then
+              echo "VIOLATION: Found execution capability '$pattern'"
+              VIOLATIONS=$((VIOLATIONS + 1))
+            fi
+          done
+          
+          if [ $VIOLATIONS -gt 0 ]; then
+            echo ""
+            echo "=========================================="
+            echo "GOVERNANCE FAILURE: Execution capability detected"
+            echo "Found $VIOLATIONS violation(s)"
+            echo "=========================================="
+            exit 1
+          fi
+          
+          echo "✓ No execution capability violations found"
+
+      - name: Scan for SoR Leakage
+        run: |
+          echo "Scanning for system-of-record leakage..."
+          
+          FORBIDDEN_PATTERNS=(
+            "updateBalance"
+            "setBalance"
+            "reconcilePosition"
+            "adjustPosition"
+            "journalEntry"
+            "ledgerEntry"
+            "postTransaction"
+            "bookTransaction"
+          )
+          
+          VIOLATIONS=0
+          
+          for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
+            if grep -rn --include="*.ts" --include="*.tsx" "$pattern" \
+               --exclude-dir=node_modules \
+               --exclude-dir=.git \
+               platform/ tenants/ api/ 2>/dev/null; then
+              echo "VIOLATION: Found SoR leakage '$pattern'"
+              VIOLATIONS=$((VIOLATIONS + 1))
+            fi
+          done
+          
+          if [ $VIOLATIONS -gt 0 ]; then
+            echo ""
+            echo "=========================================="
+            echo "GOVERNANCE FAILURE: System-of-record leakage detected"
+            echo "Found $VIOLATIONS violation(s)"
+            echo "=========================================="
+            exit 1
+          fi
+          
+          echo "✓ No system-of-record leakage found"
+
+  # =============================================================================
+  # TENANT ISOLATION VERIFICATION
+  # =============================================================================
+  tenant-isolation:
+    name: Tenant Isolation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Isolation Guards
+        run: |
+          echo "Verifying tenant isolation guards..."
+          
+          # Check that isolation guards exist
+          if [ ! -f "platform/tenancy/isolation-guards.ts" ]; then
+            echo "FAILURE: isolation-guards.ts not found"
+            exit 1
+          fi
+          
+          # Check for partition key enforcement
+          if ! grep -q "partitionKey" platform/tenancy/isolation-guards.ts; then
+            echo "FAILURE: Partition key enforcement not found in isolation guards"
+            exit 1
+          fi
+          
+          # Check for IsolationBreachError
+          if ! grep -q "IsolationBreachError" platform/tenancy/isolation-guards.ts; then
+            echo "FAILURE: IsolationBreachError not defined"
+            exit 1
+          fi
+          
+          echo "✓ Isolation guards verified"
+
+      - name: Verify Tenant Context
+        run: |
+          echo "Verifying tenant context implementation..."
+          
+          # Check that tenant context exists
+          if [ ! -f "platform/tenancy/tenant-context.ts" ]; then
+            echo "FAILURE: tenant-context.ts not found"
+            exit 1
+          fi
+          
+          # Check for AsyncLocalStorage usage
+          if ! grep -q "AsyncLocalStorage" platform/tenancy/tenant-context.ts; then
+            echo "FAILURE: AsyncLocalStorage not used for tenant context"
+            exit 1
+          fi
+          
+          echo "✓ Tenant context verified"
+
+      - name: Verify No Cross-Tenant Queries
+        run: |
+          echo "Scanning for potential cross-tenant queries..."
+          
+          # Look for queries without partition key
+          VIOLATIONS=0
+          
+          # Check for raw SQL without partition_key
+          if grep -rn "SELECT.*FROM" --include="*.ts" \
+             platform/ tenants/ api/ 2>/dev/null | \
+             grep -v "partition_key" | \
+             grep -v "test" | \
+             grep -v "\.d\.ts"; then
+            echo "WARNING: Found SELECT queries that may not include partition_key"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+          
+          if [ $VIOLATIONS -gt 0 ]; then
+            echo ""
+            echo "=========================================="
+            echo "WARNING: Potential cross-tenant query detected"
+            echo "Review the above queries to ensure partition_key filtering"
+            echo "=========================================="
+          fi
+          
+          echo "✓ Cross-tenant query scan complete"
+
+  # =============================================================================
+  # EVIDENCE INTEGRITY
+  # =============================================================================
+  evidence-integrity:
+    name: Evidence Integrity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Event Store
+        run: |
+          echo "Verifying event store implementation..."
+          
+          # Check that event store exists
+          if [ ! -f "platform/evidence/event-store.ts" ]; then
+            echo "FAILURE: event-store.ts not found"
+            exit 1
+          fi
+          
+          # Check for append-only semantics
+          if ! grep -q "appendOnly\|append-only\|immutable" platform/evidence/event-store.ts; then
+            echo "WARNING: Event store may not enforce append-only semantics"
+          fi
+          
+          echo "✓ Event store verified"
+
+      - name: Verify Evidence Linker
+        run: |
+          echo "Verifying evidence linker implementation..."
+          
+          # Check that evidence linker exists
+          if [ ! -f "platform/evidence/evidence-linker.ts" ]; then
+            echo "FAILURE: evidence-linker.ts not found"
+            exit 1
+          fi
+          
+          # Check for hash verification
+          if ! grep -q "hash\|Hash\|SHA" platform/evidence/evidence-linker.ts; then
+            echo "WARNING: Evidence linker may not implement hash verification"
+          fi
+          
+          echo "✓ Evidence linker verified"
+
+      - name: Verify Replay Engine
+        run: |
+          echo "Verifying replay engine implementation..."
+          
+          # Check that replay engine exists
+          if [ ! -f "platform/evidence/replay-engine.ts" ]; then
+            echo "FAILURE: replay-engine.ts not found"
+            exit 1
+          fi
+          
+          echo "✓ Replay engine verified"
+
+  # =============================================================================
+  # SUMMARY
+  # =============================================================================
+  governance-summary:
+    name: Governance Summary
+    runs-on: ubuntu-latest
+    needs: [governance-scan, tenant-isolation, evidence-integrity]
+    if: always()
+    steps:
+      - name: Summary
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "PLATFORM GOVERNANCE CHECK COMPLETE"
+          echo "=========================================="
+          echo ""
+          echo "Checks performed:"
+          echo "  - Advisory language scan"
+          echo "  - Execution capability scan"
+          echo "  - System-of-record leakage scan"
+          echo "  - Tenant isolation verification"
+          echo "  - Evidence integrity verification"
+          echo ""
+          echo "Platform governance enforced by CI."
