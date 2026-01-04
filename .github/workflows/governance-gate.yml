@@ -1,0 +1,58 @@
+﻿name: Governance Gate — UltraWealth Platform
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  governance-gate:
+    name: Retail / Group Isolation Enforcement
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Static check — Group route guards
+        run: npx ts-node ci/checks/group-route-guard-check.ts
+
+      - name: Static check — Retail/Group import isolation
+        run: npx ts-node ci/checks/retail-import-isolation-check.ts
+
+      - name: Static check — No direct TuringCore imports
+        run: npx ts-node ci/checks/no-direct-core-imports-check.ts
+
+      - name: Playwright — Retail cannot access Group
+        run: |
+          npx playwright install --with-deps chromium
+          npx playwright test tests/playwright/mode-gating/
+
+      - name: Retail build isolation snapshot
+        run: |
+          npm run build
+          npm test -- tests/build/retail-bundle-isolation.spec.ts
+
+      - name: TuringDynamics Group route linter
+        run: npx ts-node ci/checks/turingdynamics-group-route-linter.ts
+
+      - name: Governance summary
+        if: always()
+        run: |
+          echo "UltraWealth governance enforced."
+          echo "Retail cannot access Group."
+          echo "Group must be explicitly earned."
+          echo "Violations fail closed."

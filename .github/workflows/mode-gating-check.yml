@@ -1,0 +1,36 @@
+﻿name: Mode Gating Integrity Check
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'ci/**'
+
+permissions:
+  contents: read
+
+jobs:
+  mode-gating:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - run: npm ci
+
+      - name: Architectural integrity checks
+        run: |
+          grep -r "@turingdynamics/turingcore" src/ && exit 1 || true
+          grep -r "inferPermission\|guessRole\|assumeAccess" src/ && exit 1 || true
+          grep -r "FOUNDER\|BOARD\|AUDITOR" src/retail/ && exit 1 || true
+
+      - name: Verify single mode resolver
+        run: |
+          COUNT=$(grep -r "resolveAppMode\|determineAppMode\|getAppMode" src/ --include="*.ts" -l | wc -l)
+          if [ "$COUNT" -gt 2 ]; then exit 1; fi
