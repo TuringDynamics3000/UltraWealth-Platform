@@ -4,9 +4,9 @@ on:
   pull_request:
     branches: [ main ]
     paths:
-      - 'src/**'
-      - 'tests/**'
-      - 'ci/**'
+      - "src/**"
+      - "tests/**"
+      - "ci/**"
 
 permissions:
   contents: read
@@ -30,7 +30,11 @@ jobs:
           grep -r "inferPermission\|guessRole\|assumeAccess" src/ && exit 1 || true
           grep -r "FOUNDER\|BOARD\|AUDITOR" src/retail/ && exit 1 || true
 
-      - name: Verify single mode resolver
+      - name: Verify single mode resolver definition
         run: |
-          COUNT=$(grep -r "resolveAppMode\|determineAppMode\|getAppMode" src/ --include="*.ts" -l | wc -l)
-          if [ "$COUNT" -gt 2 ]; then exit 1; fi
+          COUNT=$(grep -r -E "function\s+(resolveAppMode|determineAppMode|getAppMode)\b" src/ --include="*.ts" | wc -l)
+          if [ "$COUNT" -ne 1 ]; then
+            echo "❌ Expected exactly one mode resolver definition, found $COUNT"
+            exit 1
+          fi
+          echo "✓ Single mode resolver definition verified"
