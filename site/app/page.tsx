@@ -1,7 +1,17 @@
-﻿export default function Home() {
+﻿import Hero from "../components/Hero";
+import PersonalContext from "../components/PersonalContext";
+import ResponsibilityTrigger from "../components/ResponsibilityTrigger";
+import GovernedReveal from "../components/GovernedReveal";
+import AdvisorContext from "../components/AdvisorContext";
+
+export default function Home() {
   return (
     <main>
-      <h1>Money is simple. Responsibility isn’t.</h1>
+      <Hero />
+      <PersonalContext />
+      <ResponsibilityTrigger />
+      <GovernedReveal />
+      <AdvisorContext />
     </main>
   );
 }
